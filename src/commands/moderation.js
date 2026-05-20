@@ -14,7 +14,86 @@ async function sendModLog(guild, embed) {
   ch.send({ embeds: [embed] }).catch(() => {});
 }
 
+function ensureCanManageChatFromMessage(message) {
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    message.reply('🚫 Cần quyền quản lý chat.').catch(() => null);
+    return false;
+  }
+  return true;
+}
+
+function ensureCanManageChatFromInteraction(interaction) {
+  if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    interaction.reply('🚫 Cần quyền quản lý chat.').catch(() => null);
+    return false;
+  }
+  return true;
+}
+
+function parseDisableState(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (['on', 'enable', 'enabled', 'true', '1', 'yes', 'bat', 'bật'].includes(value)) return true;
+  if (['off', 'disable', 'disabled', 'false', '0', 'no', 'tat', 'tắt'].includes(value)) return false;
+  return null;
+}
+
+async function setCommandsDisabled(guildId, enabled) {
+  const { setGuildSetting } = require('../services/guildSettings');
+  return setGuildSetting(guildId, { commands_disabled: Boolean(enabled) });
+}
+
+async function replyDisableStatus(target, settings) {
+  const disabled = Boolean(settings?.commands_disabled);
+  return target.reply(disabled ? '🔕 Lệnh đang tắt trong chat này.' : '🔔 Lệnh đang bật trong chat này.');
+}
+
 module.exports = [
+
+  {
+    name: 'disable',
+    category: 'moderation',
+    description: 'Turn bot commands on or off in this chat',
+    slash: {
+      data: new SlashCommandBuilder()
+        .setName('disable')
+        .setDescription('Turn bot commands on or off in this chat')
+        .addStringOption(o => o
+          .setName('state')
+          .setDescription('on = tắt lệnh, off = bật lại, status = xem trạng thái')
+          .setRequired(false)
+          .addChoices(
+            { name: 'on', value: 'on' },
+            { name: 'off', value: 'off' },
+            { name: 'status', value: 'status' }
+          ))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+      async run(interaction) {
+        if (!ensureCanManageChatFromInteraction(interaction)) return;
+        const state = interaction.options.getString('state') || 'on';
+        const parsed = parseDisableState(state);
+        if (parsed == null) {
+          const settings = await getGuildSettings(interaction.guildId);
+          return replyDisableStatus(interaction, settings);
+        }
+        const settings = await setCommandsDisabled(interaction.guildId, parsed);
+        return interaction.reply(settings.commands_disabled ? '🔕 Đã tắt toàn bộ lệnh trong chat này.' : '🔔 Đã bật lại lệnh trong chat này.');
+      }
+    },
+    prefix: {
+      async run(message, args) {
+        if (!ensureCanManageChatFromMessage(message)) return;
+        const state = args[0] || 'on';
+        const parsed = parseDisableState(state);
+        if (parsed == null) {
+          const settings = await getGuildSettings(message.guild.id);
+          return replyDisableStatus(message, settings);
+        }
+        const settings = await setCommandsDisabled(message.guild.id, parsed);
+        return message.reply(settings.commands_disabled ? '🔕 Đã tắt toàn bộ lệnh trong chat này.' : '🔔 Đã bật lại lệnh trong chat này.');
+      }
+    }
+  },
+
   {
     name: 'setlog',
     aliases: ['slog'],
