@@ -295,7 +295,7 @@ bot.on('message', async tgMessage => {
   try {
     settings = await getGuildSettings(message.guild.id);
   } catch {
-    settings = { prefix: DEFAULT_PREFIX, level_enabled: false };
+    settings = { prefix: DEFAULT_PREFIX, level_enabled: false, commands_disabled: false };
   }
 
   const prefix = settings.prefix || DEFAULT_PREFIX;
@@ -342,6 +342,10 @@ bot.on('message', async tgMessage => {
   const cmd = findCommand(parsed.name);
   if (!cmd) {
     if (client.dispatchCollectors(message)) return;
+    return;
+  }
+
+  if (settings.commands_disabled && cmd.name !== 'disable') {
     return;
   }
 
