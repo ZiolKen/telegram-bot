@@ -186,10 +186,13 @@ async function registerTelegramCommands(bot) {
   const seen = new Set();
   const list = [];
   for (const c of commands) {
-    const name = String(c.name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 32);
-    if (!name || seen.has(name)) continue;
-    seen.add(name);
-    list.push({ command: name, description: String(c.description || c.category || 'Command').slice(0, 256) });
+    const names = [c.name, ...(c.telegramAliases || [])];
+    for (const raw of names) {
+      const name = String(raw || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 32);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      list.push({ command: name, description: String(c.description || c.category || 'Command').slice(0, 256) });
+    }
   }
   await bot.setMyCommands(list.slice(0, 100)).catch(err => console.warn('Failed to set Telegram commands:', err.message || err));
 }
@@ -233,7 +236,7 @@ async function bootstrapBot() {
       try {
         const due = await popDueReminders(20);
         for (const r of due) {
-          await bot.sendMessage(r.channel_id, `⏰ tg://user?id=${r.user_id} Reminder: **${r.text}**`, { disable_web_page_preview: true }).catch(() => null);
+          await bot.sendMessage(r.channel_id, `⏰ Reminder for @${r.user_id}: ${r.text}`, { disable_web_page_preview: true }).catch(() => null);
         }
       } catch (e) {
         console.warn('Reminder scheduler error:', e);
@@ -294,11 +297,17 @@ bot.on('message', async tgMessage => {
     settings = { prefix: DEFAULT_PREFIX, level_enabled: false };
   }
 
+  const prefix = settings.prefix || DEFAULT_PREFIX;
+  const parsed = splitCommand(message.content, client.me?.username) || splitPrefix(message.content, prefix);
+
   try {
-    if (settings.level_enabled) {
-      const result = await addXp(message.guild.id, message.author.id, 15);
+    const allowCommandXp = process.env.LEVEL_XP_COMMANDS === '1';
+    const minLen = Math.max(1, Number.parseInt(process.env.LEVEL_MIN_MESSAGE_LENGTH || '2', 10) || 2);
+    const content = String(message.content || '').trim();
+    if (settings.level_enabled && content.length >= minLen && (!parsed || allowCommandXp)) {
+      const result = await addXp(message.guild.id, message.author.id);
       if (result?.leveledUp) {
-        await message.channel.send(`🎉 ${message.author} leveled up to **${result.level}**!`).catch(() => null);
+        await message.channel.send(`🎉 ${message.author} lên level ${result.level}! ${result.xp}/${result.nextXp} XP`).catch(() => null);
       }
     }
   } catch {}
@@ -307,17 +316,14 @@ bot.on('message', async tgMessage => {
     for (const [id] of message.mentions.users) {
       const key = `${message.guild.id}:${id}`;
       const afk = afkMap.get(key);
-      if (afk) await message.reply(`💤 tg://user?id=${id} is AFK: **${afk.reason || 'AFK'}**`).catch(() => null);
+      if (afk) await message.reply(`💤 @${id} đang AFK: ${afk.reason || 'AFK'}`).catch(() => null);
     }
     const selfKey = `${message.guild.id}:${message.author.id}`;
     if (afkMap.has(selfKey)) {
       afkMap.delete(selfKey);
-      await message.reply('✅ Welcome back! Your AFK status has been removed.').catch(() => null);
+      await message.reply('✅ Welcome back! AFK removed.').catch(() => null);
     }
   } catch {}
-
-  const prefix = settings.prefix || DEFAULT_PREFIX;
-  const parsed = splitCommand(message.content, client.me?.username) || splitPrefix(message.content, prefix);
 
   if (!parsed) {
     client.dispatchCollectors(message);
@@ -348,7 +354,7 @@ bot.on('message', async tgMessage => {
     console.error('Command error:', err);
     services.commands = 'offline';
     await createIncident('commands', 'Command execution failed');
-    await message.reply(`⚠️ Command error: ${err.message || 'unknown'}`).catch(() => null);
+    await message.reply(`⚠️ Lỗi lệnh: ${err.message || 'unknown'}`).catch(() => null);
   }
 });
 
@@ -441,7 +447,6 @@ app.get('/status', async (req, res) => {
     lastBoot,
     updated: isoNow(),
     host: HOST_PROVIDER,
-    guilds: client.guilds.cache.size,
     chats: client.guilds.cache.size,
     users: computeUsers(client),
     services
