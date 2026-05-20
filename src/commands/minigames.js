@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('../telegram/discordCompat');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('../telegram/discordCompat');
 const { getOrCreate, claimDaily, claimWeekly, DAILY_COOLDOWN_MS, WEEKLY_COOLDOWN_MS } = require('../services/economy');
 const { createSession, endSession } = require('../services/gameSessions');
 const db = require('../db');
@@ -6,6 +6,7 @@ const { toDiscordTs } = require('../utils/time');
 const { randInt } = require('../services/casino');
 const gathering = require('../services/gathering');
 const { economyGuildId } = require('../services/economyScope');
+const noitu = require('../services/noitu');
 
 const TTT_LINES = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -95,7 +96,179 @@ async function ensureRow(guildId, userId) {
   return getOrCreate(guildId, userId);
 }
 
+
+function isPrivateChat(source) {
+  return source?.chat?.type === 'private' || source?.channel?.type === 'private';
+}
+
+function canManageNoiTu(source) {
+  if (isPrivateChat(source)) return true;
+  return Boolean(source?.member?.permissions?.has?.(PermissionFlagsBits.Administrator));
+}
+
+async function replyNoiTu(source, text) {
+  return source.reply(String(text || ' '));
+}
+
+async function runNoiTuAction(source, action, value) {
+  const guildId = source.guild?.id || source.guildId;
+  const userId = source.author?.id || source.user?.id;
+  const cmd = String(action || 'help').toLowerCase();
+
+  if (['add', 'start', 'on', 'enable'].includes(cmd)) {
+    if (!canManageNoiTu(source)) return replyNoiTu(source, '❌ Chỉ admin nhóm mới bật được nối từ.');
+    const game = await noitu.enableGame(guildId);
+    return replyNoiTu(source, `🎮 Đã bật nối từ.\nMode: ${game.mode}\nTừ hiện tại: ${game.word}`);
+  }
+
+  if (['remove', 'stop', 'off', 'disable', 'delete'].includes(cmd)) {
+    if (!canManageNoiTu(source)) return replyNoiTu(source, '❌ Chỉ admin nhóm mới tắt được nối từ.');
+    const removed = await noitu.disableGame(guildId);
+    return replyNoiTu(source, removed ? '🗑️ Đã tắt nối từ và xoá dữ liệu phòng.' : 'Nối từ chưa bật trong chat này.');
+  }
+
+  if (cmd === 'mode') {
+    if (!canManageNoiTu(source)) return replyNoiTu(source, '❌ Chỉ admin nhóm mới đổi mode.');
+    const mode = String(value || '').toLowerCase();
+    if (!['bot', 'pvp'].includes(mode)) return replyNoiTu(source, 'Dùng: /noitu mode bot hoặc /noitu mode pvp');
+    const game = await noitu.setMode(guildId, mode);
+    return replyNoiTu(source, `✅ Đã đổi mode: ${game.mode}\nTừ hiện tại: ${game.word}`);
+  }
+
+  if (['new', 'reset', 'newgame'].includes(cmd)) {
+    if (!canManageNoiTu(source)) return replyNoiTu(source, '❌ Chỉ admin nhóm mới reset nối từ.');
+    const game = await noitu.resetGame(guildId);
+    return replyNoiTu(source, `🔄 Game mới.\nTừ hiện tại: ${game.word}`);
+  }
+
+  if (['stats', 'me'].includes(cmd)) {
+    const { game, stats } = await noitu.getStats(guildId, userId);
+    const word = game?.word ? `\nTừ hiện tại: ${game.word}` : '';
+    return replyNoiTu(source, `📊 Thống kê nối từ\nChuỗi: ${stats.currentStreak}\nKỷ lục: ${stats.bestStreak}\nThắng: ${stats.wins}${word}`);
+  }
+
+  if (cmd === 'top') {
+    const rows = await noitu.getTop(guildId, 10);
+    if (!rows.length) return replyNoiTu(source, 'Chưa có BXH nối từ.');
+    const lines = rows.map((r, i) => `${i + 1}. @${r.userId}: kỷ lục ${r.bestStreak}, thắng ${r.wins}`);
+    return replyNoiTu(source, `🏆 Top nối từ\n${lines.join('\n')}`);
+  }
+
+  if (['word', 'status'].includes(cmd)) {
+    const game = await noitu.readGame(guildId);
+    return replyNoiTu(source, noitu.statusText(game));
+  }
+
+  if (['lookup', 'tratu', 'dict'].includes(cmd)) {
+    if (!value) return replyNoiTu(source, 'Dùng: /noitu lookup <từ>');
+    return replyNoiTu(source, await noitu.lookupWord(value));
+  }
+
+  return replyNoiTu(source, noitu.helpText());
+}
+
+function noituMainSlashBuilder() {
+  return new SlashCommandBuilder()
+    .setName('noitu')
+    .setDescription('Nối từ tiếng Việt')
+    .addSubcommand(o => o.setName('help').setDescription('Hướng dẫn nối từ'))
+    .addSubcommand(o => o.setName('add').setDescription('Bật phòng nối từ'))
+    .addSubcommand(o => o.setName('remove').setDescription('Tắt phòng nối từ'))
+    .addSubcommand(o => o.setName('mode').setDescription('Đổi mode').addStringOption(x => x.setName('mode').setDescription('bot hoặc pvp').setRequired(true).addChoices(
+      { name: 'bot', value: 'bot' },
+      { name: 'pvp', value: 'pvp' }
+    )))
+    .addSubcommand(o => o.setName('new').setDescription('Reset game'))
+    .addSubcommand(o => o.setName('stats').setDescription('Xem thống kê'))
+    .addSubcommand(o => o.setName('top').setDescription('BXH nối từ'))
+    .addSubcommand(o => o.setName('word').setDescription('Xem từ hiện tại'))
+    .addSubcommand(o => o.setName('lookup').setDescription('Tra từ').addStringOption(x => x.setName('word').setDescription('Từ cần tra').setRequired(true)));
+}
+
 module.exports = [
+  {
+    name: 'noitu',
+    aliases: ['nt'],
+    telegramAliases: ['noi_tu'],
+    category: 'minigames',
+    description: 'Chơi nối từ tiếng Việt',
+    slash: {
+      data: noituMainSlashBuilder(),
+      async run(interaction) {
+        const sub = interaction.options.getSubcommand() || 'help';
+        const value = sub === 'mode' ? interaction.options.getString('mode') : sub === 'lookup' ? interaction.options.getString('word') : null;
+        return runNoiTuAction(interaction, sub, value);
+      }
+    },
+    prefix: { async run(message, args) {
+      const [action = 'help', ...rest] = args;
+      return runNoiTuAction(message, action, rest.join(' '));
+    } }
+  },
+
+  {
+    name: 'noitu_add',
+    aliases: ['ntadd'],
+    category: 'minigames',
+    description: 'Bật phòng nối từ',
+    slash: { data: new SlashCommandBuilder().setName('noitu_add').setDescription('Bật phòng nối từ'), async run(interaction) { return runNoiTuAction(interaction, 'add'); } },
+    prefix: { async run(message) { return runNoiTuAction(message, 'add'); } }
+  },
+
+  {
+    name: 'noitu_remove',
+    aliases: ['ntremove'],
+    category: 'minigames',
+    description: 'Tắt phòng nối từ',
+    slash: { data: new SlashCommandBuilder().setName('noitu_remove').setDescription('Tắt phòng nối từ'), async run(interaction) { return runNoiTuAction(interaction, 'remove'); } },
+    prefix: { async run(message) { return runNoiTuAction(message, 'remove'); } }
+  },
+
+  {
+    name: 'noitu_mode',
+    aliases: ['ntmode'],
+    category: 'minigames',
+    description: 'Đổi mode nối từ',
+    slash: {
+      data: new SlashCommandBuilder().setName('noitu_mode').setDescription('Đổi mode nối từ').addStringOption(o => o.setName('mode').setDescription('bot hoặc pvp').setRequired(true).addChoices(
+        { name: 'bot', value: 'bot' },
+        { name: 'pvp', value: 'pvp' }
+      )),
+      async run(interaction) { return runNoiTuAction(interaction, 'mode', interaction.options.getString('mode')); }
+    },
+    prefix: { async run(message, args) { return runNoiTuAction(message, 'mode', args[0]); } }
+  },
+
+  {
+    name: 'newgame',
+    aliases: ['ntnew'],
+    category: 'minigames',
+    description: 'Reset game nối từ',
+    slash: { data: new SlashCommandBuilder().setName('newgame').setDescription('Reset game nối từ'), async run(interaction) { return runNoiTuAction(interaction, 'new'); } },
+    prefix: { async run(message) { return runNoiTuAction(message, 'new'); } }
+  },
+
+  {
+    name: 'stats',
+    aliases: ['noitustats', 'ntstats'],
+    category: 'minigames',
+    description: 'Thống kê nối từ',
+    slash: { data: new SlashCommandBuilder().setName('stats').setDescription('Thống kê nối từ'), async run(interaction) { return runNoiTuAction(interaction, 'stats'); } },
+    prefix: { async run(message) { return runNoiTuAction(message, 'stats'); } }
+  },
+
+  {
+    name: 'tratu',
+    aliases: ['dict', 'lookup'],
+    category: 'minigames',
+    description: 'Tra từ tiếng Việt',
+    slash: {
+      data: new SlashCommandBuilder().setName('tratu').setDescription('Tra từ tiếng Việt').addStringOption(o => o.setName('word').setDescription('Từ cần tra').setRequired(true)),
+      async run(interaction) { return runNoiTuAction(interaction, 'lookup', interaction.options.getString('word')); }
+    },
+    prefix: { async run(message, args) { return runNoiTuAction(message, 'lookup', args.join(' ')); } }
+  },
+
   {
     name: 'coinflip',
     aliases: ['cf'],
