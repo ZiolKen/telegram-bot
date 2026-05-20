@@ -9,6 +9,7 @@ const { all: commands, findCommand } = require('./commands/_registry');
 const { getGuildSettings } = require('./services/guildSettings');
 const { handleAutoMod } = require('./services/automod');
 const { addXp } = require('./services/leveling');
+const { handleNoiTuMessage } = require('./services/noitu');
 const { popDueReminders } = require('./services/reminders');
 const { listIncidents, createIncident: createIncidentDb, resolveIncident: resolveIncidentDb } = require('./services/incidents');
 const { handleButton } = require('./services/gameSessions');
@@ -326,13 +327,21 @@ bot.on('message', async tgMessage => {
   } catch {}
 
   if (!parsed) {
-    client.dispatchCollectors(message);
+    if (client.dispatchCollectors(message)) return;
+    try {
+      const noituHandled = await handleNoiTuMessage(message);
+      if (noituHandled) return;
+    } catch (e) {
+      console.warn('Noi Tu error:', e);
+      await message.reply('⚠️ Lỗi nối từ. Thử lại sau.').catch(() => null);
+      return;
+    }
     return;
   }
 
   const cmd = findCommand(parsed.name);
   if (!cmd) {
-    client.dispatchCollectors(message);
+    if (client.dispatchCollectors(message)) return;
     return;
   }
 

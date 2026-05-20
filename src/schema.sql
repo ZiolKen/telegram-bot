@@ -155,3 +155,21 @@ CREATE TABLE IF NOT EXISTS bot_meta (
   value      TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS noitu_games (
+  guild_id TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  mode TEXT NOT NULL DEFAULT 'bot',
+  current_word TEXT,
+  history JSONB NOT NULL DEFAULT '[]'::jsonb,
+  players JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (mode IN ('bot', 'pvp'))
+);
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'bot';
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS current_word TEXT;
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS history JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS players JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE noitu_games ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+CREATE INDEX IF NOT EXISTS idx_noitu_games_enabled ON noitu_games(enabled);
