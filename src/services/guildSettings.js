@@ -22,7 +22,8 @@ const ALLOWED_KEYS = new Set([
   'am_max_mentions',
   'am_caps_ratio',
   'am_min_acc_age_days',
-  'level_enabled'
+  'level_enabled',
+  'commands_disabled'
 ]);
 
 function filterPatch(patch) {
