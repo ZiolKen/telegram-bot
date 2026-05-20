@@ -11,6 +11,7 @@ const { getGuildSettings, setGuildSetting } = require('../services/guildSettings
 const { parseDuration, toDiscordTs } = require('../utils/time');
 const { createReminder, listReminders } = require('../services/reminders');
 const { createSession, endSession } = require('../services/gameSessions');
+const { getLevel, getLevelLeaderboard } = require('../services/leveling');
 
 function hasDisallowedMentions(text) {
   const s = String(text || '');
@@ -90,6 +91,40 @@ function chunkText(text, max = 900) {
   }
   if (s) out.push(s);
   return out;
+}
+
+function displayUser(user) {
+  return user?.tag || user?.username || user?.globalName || `user${user?.id || ''}`;
+}
+
+function formatLevelView(view, user) {
+  const rank = view.rank ? `#${view.rank}` : 'unranked';
+  return [
+    `⭐ Level — ${displayUser(user)}`,
+    `Level: ${view.level} (${rank})`,
+    `XP: ${view.xp}/${view.nextXp} (${view.percent}%)`,
+    view.bar
+  ].join('\n');
+}
+
+function resolveLevelUser(message, args = []) {
+  const mentioned = message.mentions?.users?.first?.();
+  if (mentioned) return mentioned;
+  const raw = String(args[0] || '').trim();
+  if (/^\d{4,}$/.test(raw)) return { id: raw, username: raw, tag: `@${raw}` };
+  return message.author;
+}
+
+async function replyLevelStatus(target, guildId) {
+  const s = await getGuildSettings(guildId);
+  return target.reply(`Leveling: ${s.level_enabled ? 'ON' : 'OFF'}`);
+}
+
+async function replyLevelLeaderboard(target, guildId, limit = 10) {
+  const rows = await getLevelLeaderboard(guildId, limit);
+  if (!rows.length) return target.reply('⭐ Chưa có dữ liệu leveling.');
+  const lines = rows.map(r => `${r.rank}. @${r.userId} — Lv ${r.level}, ${r.xp}/${r.nextXp} XP`);
+  return target.reply(`🏆 Level Top\n${lines.join('\n')}`);
 }
 
 async function lingvaTranslate(text, targetAlias, sourceAlias = 'auto') {
@@ -346,7 +381,7 @@ module.exports = [
           .addFields(
             { name: 'Username', value: bot.tag, inline: true },
             { name: 'ID', value: bot.id, inline: true },
-            { name: 'Servers', value: String(ctx.client.guilds.cache.size), inline: true },
+            { name: 'Chats', value: String(ctx.client.guilds.cache.size), inline: true },
             { name: 'Uptime', value: ctx.uptime(), inline: true }
           )
           .setThumbnail(bot.displayAvatarURL())
@@ -356,7 +391,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args, ctx) {
-        return message.reply(`🤖 **${ctx.client.user.tag}** | Servers: **${ctx.client.guilds.cache.size}** | Uptime: **${ctx.uptime()}**`);
+        return message.reply(`🤖 **${ctx.client.user.tag}** | Chats: ${ctx.client.guilds.cache.size} | Uptime: **${ctx.uptime()}**`);
       }
     }
   },
@@ -401,7 +436,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 You need **Manage Server**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 Cần quyền quản lý chat.');
         const value = args[0];
         const s = await getGuildSettings(message.guild.id);
         if (!value) return message.reply(`Current prefix: \`${s.prefix || '!'}\``);
@@ -435,17 +470,17 @@ module.exports = [
   },
 
   {
-    name: 'serverinfo',
-    aliases: ['si'],
+    name: 'chatinfo',
+    aliases: ['serverinfo','si','guildinfo','guild','chat'],
     category: 'utilities',
-    description: 'Server info',
+    description: 'Chat info',
     slash: {
-      data: new SlashCommandBuilder().setName('serverinfo').setDescription('Server info'),
+      data: new SlashCommandBuilder().setName('chatinfo').setDescription('Chat info'),
       async run(interaction) {
         const g = interaction.guild;
         const owner = await g.fetchOwner();
         const embed = new EmbedBuilder()
-          .setTitle('🏠 Server Info')
+          .setTitle('🏠 Chat Info')
           .setColor(0xFF00FF)
           .addFields(
             { name: 'Name', value: g.name, inline: true },
@@ -463,7 +498,7 @@ module.exports = [
       async run(message) {
         const g = message.guild;
         const owner = await g.fetchOwner();
-        return message.reply(`🏠 **${g.name}** | Owner: <@${owner.id}> | Members: **${g.memberCount}**`);
+        return message.reply(`🏠 ${g.name} | Owner: @${owner.id} | Members: ${g.memberCount}`);
       }
     }
   },
@@ -554,21 +589,21 @@ module.exports = [
   },
 
   {
-    name: 'servericon',
-    aliases: ['sico','sic','sicon'],
+    name: 'chaticon',
+    aliases: ['servericon','guildicon','sico','sic','sicon'],
     category: 'utilities',
-    description: 'Get server icon',
+    description: 'Get chat icon',
     slash: {
-      data: new SlashCommandBuilder().setName('servericon').setDescription('Get server icon'),
+      data: new SlashCommandBuilder().setName('chaticon').setDescription('Get chat icon'),
       async run(interaction) {
         const url = interaction.guild.iconURL({ size: 2048, dynamic: true });
-        return interaction.reply(url || 'This server has no icon.');
+        return interaction.reply(url || 'This chat has no icon.');
       }
     },
     prefix: {
       async run(message) {
         const url = message.guild.iconURL({ size: 2048, dynamic: true });
-        return message.reply(url || 'This server has no icon.');
+        return message.reply(url || 'This chat has no icon.');
       }
     }
   },
@@ -645,11 +680,11 @@ module.exports = [
     name: 'timestamp',
     aliases: ['tt'],
     category: 'utilities',
-    description: 'Make a Discord timestamp from UNIX seconds',
+    description: 'Make a relative timestamp from UNIX seconds',
     slash: {
       data: new SlashCommandBuilder()
         .setName('timestamp')
-        .setDescription('Make a Discord timestamp from UNIX seconds')
+        .setDescription('Make a relative timestamp from UNIX seconds')
         .addIntegerOption(o => o.setName('unix').setDescription('UNIX seconds').setRequired(true)),
       async run(interaction) {
         const unix = interaction.options.getInteger('unix');
@@ -936,49 +971,63 @@ module.exports = [
 
   {
     name: 'level',
-    aliases: ['lv'],
-    category: 'utilities',
-    description: 'Toggle leveling system',
+    aliases: ['lv', 'rank', 'xp'],
+    telegramAliases: ['rank', 'xp', 'leveltop'],
+    category: 'leveling',
+    description: 'Level, rank and leveling settings',
     slash: {
       data: new SlashCommandBuilder()
         .setName('level')
-        .setDescription('Toggle leveling system')
+        .setDescription('Show your level or manage leveling')
         .addStringOption(o =>
           o.setName('mode')
-            .setDescription('on/off/status')
-            .setRequired(true)
+            .setDescription('me/top/status/on/off')
+            .setRequired(false)
             .addChoices(
+              { name: 'me', value: 'me' },
+              { name: 'top', value: 'top' },
+              { name: 'status', value: 'status' },
               { name: 'on', value: 'on' },
-              { name: 'off', value: 'off' },
-              { name: 'status', value: 'status' }
+              { name: 'off', value: 'off' }
             )
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        ),
       async run(interaction) {
-        const { getGuildSettings, setGuildSetting } = require('../services/guildSettings');
-        const mode = interaction.options.getString('mode');
-        if (mode === 'status') {
-          const s = await getGuildSettings(interaction.guildId);
-          return interaction.reply({ content: `Leveling is **${s.level_enabled ? 'ON' : 'OFF'}**.`, ephemeral: true });
+        const mode = String(interaction.options.getString('mode') || 'me').toLowerCase();
+        if (mode === 'top') return replyLevelLeaderboard(interaction, interaction.guildId, 10);
+        if (mode === 'status') return replyLevelStatus(interaction, interaction.guildId);
+        if (mode === 'on' || mode === 'off') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            return interaction.reply({ content: '🚫 Cần quyền quản lý chat.', ephemeral: true });
+          }
+          const enabled = mode === 'on';
+          await setGuildSetting(interaction.guildId, { level_enabled: enabled });
+          return interaction.reply({ content: `✅ Leveling: ${enabled ? 'ON' : 'OFF'}`, ephemeral: true });
         }
-        const enabled = mode === 'on';
-        await setGuildSetting(interaction.guildId, { level_enabled: enabled });
-        return interaction.reply({ content: `✅ Leveling is now **${enabled ? 'ON' : 'OFF'}**.`, ephemeral: true });
+        const view = await getLevel(interaction.guildId, interaction.user.id);
+        return interaction.reply(formatLevelView(view, interaction.user));
       }
     },
     prefix: {
       async run(message, args) {
-        const { getGuildSettings, setGuildSetting } = require('../services/guildSettings');
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 You need **Manage Server**.');
-        const mode = String(args[0] || '').toLowerCase();
-        if (!mode || !['on','off','status'].includes(mode)) return message.reply('Usage: `!level on|off|status`');
-        if (mode === 'status') {
-          const s = await getGuildSettings(message.guild.id);
-          return message.reply(`Leveling is **${s.level_enabled ? 'ON' : 'OFF'}**.`);
+        const invoked = String(message.content || '').trim().split(/\s+/)[0].replace(/^[!\/]/, '').split('@')[0].toLowerCase();
+        const mode = String(args[0] || (invoked === 'leveltop' ? 'top' : 'me')).toLowerCase();
+        if (['on', 'off', 'status'].includes(mode)) {
+          if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 Cần quyền quản lý chat.');
+          if (mode === 'status') return replyLevelStatus(message, message.guild.id);
+          const enabled = mode === 'on';
+          await setGuildSetting(message.guild.id, { level_enabled: enabled });
+          return message.reply(`✅ Leveling: ${enabled ? 'ON' : 'OFF'}`);
         }
-        const enabled = mode === 'on';
-        await setGuildSetting(message.guild.id, { level_enabled: enabled });
-        return message.reply(`✅ Leveling is now **${enabled ? 'ON' : 'OFF'}**.`);
+
+        if (['top', 'leaderboard', 'lb'].includes(mode)) {
+          const limit = Number.parseInt(args[1] || '10', 10) || 10;
+          return replyLevelLeaderboard(message, message.guild.id, limit);
+        }
+
+        const offset = ['me', 'rank', 'profile'].includes(mode) ? 1 : 0;
+        const user = resolveLevelUser(message, args.slice(offset));
+        const view = await getLevel(message.guild.id, user.id);
+        return message.reply(formatLevelView(view, user));
       }
     }
   },
@@ -987,9 +1036,9 @@ module.exports = [
     name: 'servers',
     aliases: ['svs'],
     category: 'utilities',
-    description: 'List servers the bot is in (owner only)',
+    description: 'List chats the bot is in (owner only)',
     slash: {
-      data: new SlashCommandBuilder().setName('servers').setDescription('List servers the bot is in (owner only)'),
+      data: new SlashCommandBuilder().setName('servers').setDescription('List chats the bot is in (owner only)'),
       async run(interaction, ctx) {
         const ownerId = process.env.OWNER_ID;
         if (!ownerId || interaction.user.id !== ownerId) {
@@ -1004,12 +1053,12 @@ module.exports = [
         const body = lines.join('\n');
 
         if (body.length <= 1800) {
-          return interaction.reply({ content: `**Servers (${guilds.length})**\n${body}`, ephemeral: true });
+          return interaction.reply({ content: `Chats (${guilds.length})\n${body}`, ephemeral: true });
         }
 
         const buf = Buffer.from(body, 'utf8');
-        const file = new AttachmentBuilder(buf, { name: 'servers.txt' });
-        return interaction.reply({ content: `**Servers (${guilds.length})**`, files: [file], ephemeral: true });
+        const file = new AttachmentBuilder(buf, { name: 'chats.txt' });
+        return interaction.reply({ content: `Chats (${guilds.length})`, files: [file], ephemeral: true });
       }
     },
     prefix: {
@@ -1024,11 +1073,11 @@ module.exports = [
         const lines = guilds.map((g, i) => `${i + 1}. ${g.name} (${g.id}) members:${g.members}`);
         const body = lines.join('\n');
 
-        if (body.length <= 1900) return message.reply(`**Servers (${guilds.length})**\n${body}`);
+        if (body.length <= 1900) return message.reply(`Chats (${guilds.length})\n${body}`);
 
         const buf = Buffer.from(body, 'utf8');
-        const file = new AttachmentBuilder(buf, { name: 'servers.txt' });
-        return message.reply({ content: `**Servers (${guilds.length})**`, files: [file] });
+        const file = new AttachmentBuilder(buf, { name: 'chats.txt' });
+        return message.reply({ content: `Chats (${guilds.length})`, files: [file] });
       }
     }
   },

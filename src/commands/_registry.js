@@ -26,7 +26,7 @@ function buildSlashJSON() {
 
 function findCommand(name) {
   const n = String(name || '').toLowerCase();
-  return all.find(c => c.name === n || (c.aliases || []).includes(n));
+  return all.find(c => c.name === n || (c.aliases || []).includes(n) || (c.telegramAliases || []).includes(n));
 }
 
 module.exports = { all, buildSlashJSON, findCommand };

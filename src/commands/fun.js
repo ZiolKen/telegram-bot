@@ -163,7 +163,7 @@ module.exports = [
         .setName('hangman')
         .setDescription('Play hangman'),
       async run(interaction) {
-        const WORDS = ['discord', 'javascript', 'postgres', 'sharding', 'economy', 'roulette', 'minigame', 'inventory', 'marketplace', 'stability'];
+        const WORDS = ['telegram', 'javascript', 'postgres', 'sharding', 'economy', 'roulette', 'minigame', 'inventory', 'marketplace', 'stability'];
         const word = WORDS[randInt(0, WORDS.length - 1)].toLowerCase();
         const guessed = new Set();
         let lives = 7;
@@ -214,7 +214,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        const WORDS = ['discord', 'javascript', 'postgres', 'sharding', 'economy', 'roulette', 'minigame', 'inventory', 'marketplace', 'stability'];
+        const WORDS = ['telegram', 'javascript', 'postgres', 'sharding', 'economy', 'roulette', 'minigame', 'inventory', 'marketplace', 'stability'];
         const word = WORDS[randInt(0, WORDS.length - 1)].toLowerCase();
         const guessed = new Set();
         let lives = 7;

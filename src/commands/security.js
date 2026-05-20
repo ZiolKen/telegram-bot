@@ -69,7 +69,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 You need **Manage Server**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 Cần quyền quản lý chat.');
         const sub = (args[0] || '').toLowerCase();
 
         if (sub === 'status') {

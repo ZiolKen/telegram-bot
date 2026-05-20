@@ -35,7 +35,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 You need **Manage Server**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) return message.reply('🚫 Cần quyền quản lý chat.');
         const ch = message.mentions.channels.first();
         if (!ch) return message.reply('Usage: `!setlog #channel`');
         const { setGuildSetting } = require('../services/guildSettings');
@@ -76,7 +76,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return message.reply('🚫 You need **Ban Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return message.reply('🚫 Cần quyền ban thành viên.');
         const user = message.mentions.users.first();
         if (!user) return message.reply('Usage: `!ban @user [reason]`');
         const reason = args.slice(1).join(' ') || 'No reason provided';
@@ -104,7 +104,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return message.reply('🚫 You need **Ban Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return message.reply('🚫 Cần quyền ban thành viên.');
         const id = args[0];
         if (!id) return message.reply('Usage: `!unban <userId>`');
         await message.guild.members.unban(id).catch(() => null);
@@ -133,7 +133,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) return message.reply('🚫 You need **Kick Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) return message.reply('🚫 Cần quyền kick thành viên.');
         const member = message.mentions.members.first();
         if (!member) return message.reply('Usage: `!kick @user [reason]`');
         const reason = args.slice(1).join(' ') || 'No reason provided';
@@ -165,7 +165,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 You need **Moderate Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 Cần quyền quản lý thành viên.');
         const member = message.mentions.members.first();
         const sec = parseInt(args[1], 10);
         if (!member || !sec) return message.reply('Usage: `!timeout @user <seconds> [reason]`');
@@ -194,7 +194,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 You need **Moderate Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 Cần quyền quản lý thành viên.');
         const member = message.mentions.members.first();
         if (!member) return message.reply('Usage: `!untimeout @user`');
         await member.timeout(null).catch(() => null);
@@ -223,7 +223,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('🚫 You need **Manage Messages**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return message.reply('🚫 Cần quyền quản lý tin nhắn.');
         const amount = parseInt(args[0], 10);
         if (!amount || amount < 1 || amount > 100) return message.reply('Usage: `!purge 1-100`');
         await message.channel.bulkDelete(amount, true).catch(() => null);
@@ -251,7 +251,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 You need **Manage Channels**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 Cần quyền quản lý chat.');
         const sec = parseInt(args[0], 10);
         if (Number.isNaN(sec) || sec < 0 || sec > 21600) return message.reply('Usage: `!slowmode <0-21600>`');
         await message.channel.setRateLimitPerUser(sec).catch(()=>null);
@@ -277,7 +277,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 You need **Manage Channels**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 Cần quyền quản lý chat.');
         await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false }).catch(()=>null);
         return message.reply('🔒 Channel locked.');
       }
@@ -301,7 +301,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 You need **Manage Channels**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) return message.reply('🚫 Cần quyền quản lý chat.');
         await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null }).catch(()=>null);
         return message.reply('🔓 Channel unlocked.');
       }
@@ -332,7 +332,7 @@ module.exports = [
     },
     prefix: {
       async run(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 You need **Moderate Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 Cần quyền quản lý thành viên.');
         const user = message.mentions.users.first();
         if (!user) return message.reply('Usage: `!warn @user [reason]`');
         const reason = args.slice(1).join(' ') || null;
@@ -371,7 +371,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 You need **Moderate Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 Cần quyền quản lý thành viên.');
         const user = message.mentions.users.first();
         if (!user) return message.reply('Usage: `!warnings @user`');
         const { rows } = await db.queryGuild(
@@ -404,7 +404,7 @@ module.exports = [
     },
     prefix: {
       async run(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 You need **Moderate Members**.');
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return message.reply('🚫 Cần quyền quản lý thành viên.');
         const user = message.mentions.users.first();
         if (!user) return message.reply('Usage: `!clearwarns @user`');
         await db.queryGuild(message.guild.id, `DELETE FROM warns WHERE guild_id=$1 AND user_id=$2`, [message.guild.id, user.id]);
