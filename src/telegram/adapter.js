@@ -357,11 +357,12 @@ class TelegramCollector extends EventEmitter {
     if (this.timer.unref) this.timer.unref();
   }
   tryCollect(message) {
-    if (this.ended || asId(message.chat.id) !== this.chatId) return;
-    if (!this.filter(message)) return;
+    if (this.ended || asId(message.chat.id) !== this.chatId) return false;
+    if (!this.filter(message)) return false;
     this.collected.push(message);
     this.emit('collect', message);
     if (this.collected.length >= this.max) this.stop('limit');
+    return true;
   }
   stop(reason = 'user') {
     if (this.ended) return;
@@ -448,7 +449,11 @@ class TelegramDiscordAdapter {
   }
 
   dispatchCollectors(message) {
-    for (const c of Array.from(this.collectors)) c.tryCollect(message);
+    let handled = false;
+    for (const c of Array.from(this.collectors)) {
+      if (c.tryCollect(message)) handled = true;
+    }
+    return handled;
   }
 
   async getMember(chat, user) {
