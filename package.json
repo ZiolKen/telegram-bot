@@ -1,6 +1,6 @@
 {
   "name": "ziolken-telegram-bot",
-  "version": "1.2.0-tg",
+  "version": "1.2.1-tg",
   "description": "Telegram-first utilities, moderation, economy, minigames, leveling and Vietnamese word-chain bot.",
   "main": "src/index.js",
   "type": "commonjs",
