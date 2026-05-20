@@ -35,10 +35,11 @@ const LOWPOLY = svgDataUri(`
 </svg>
 `);
 
-function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statusUrl }) {
-  const safeName = String(appName || 'ジオルケン');
-  const invite = String(inviteUrl || 'https://discord.com/oauth2/authorize?client_id=1398238289500307578&scope=bot&permissions=8');
-  const support = String(supportServer || 'https://discord.gg/X7QrJvx7Sp');
+function renderLandingPage({ inviteUrl, appName, title, clientId, botAvatar, supportServer, statusUrl }) {
+  const username = String(clientId || '').replace(/^@/, '');
+  const safeName = String(appName || title || (username ? `@${username}` : 'ジオルケン'));
+  const invite = String(inviteUrl || (username ? `https://t.me/${encodeURIComponent(username)}` : 'https://t.me/'));
+  const support = String(supportServer || 'https://github.com/ZiolKen/telegram-bot');
   const status = String(statusUrl || '/status');
   const avatar = botAvatar ? `<img class="brand__avatar" src="../../assets/logo.png" alt="ジオルケン"/>` : '';
 
@@ -48,7 +49,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
   data-bot-name="${safeName}"
   data-bot-invite="${invite}"
   data-bot-support="${support}"
-  data-bot-github="https://github.com/ZiolKen/discord-bot"
+  data-bot-github="https://github.com/ZiolKen/telegram-bot"
   data-bot-status="https://botstatus.vercel.app"
   data-bot-status-api="/status"
   data-bot-incidents-api="/incidents"
@@ -109,10 +110,10 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
           </nav>
           <nav class="nav" aria-label="Nav btn">
             <a class="btn btnPrimary" data-bind-href="invite" href="${invite}" target="_blank" rel="noopener noreferrer">
-              Invite
+              Open
               <span class="kbd">+</span>
             </a>
-            <a class="btn" data-bind-href="github" href="https://github.com/ZiolKen/discord-bot" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a class="btn" data-bind-href="github" href="https://github.com/ZiolKen/telegram-bot" target="_blank" rel="noopener noreferrer">GitHub</a>
           </nav>
         </div>
       </div>
@@ -133,12 +134,12 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
               </h1>
 
               <p class="lead reveal">
-                A <strong>utilities-first</strong> Telegram bot built for <strong>moderation</strong>, <strong>economy & minigames</strong>, and <strong>server tools</strong> — with an Express-powered status API for real-time visibility.
+                A <strong>utilities-first</strong> Telegram bot built for <strong>moderation</strong>, <strong>economy & minigames</strong>, and <strong>chat tools</strong> — with an Express-powered status API for real-time visibility.
               </p>
 
               <div class="heroActions reveal">
                 <a class="btn btnPrimary" data-bind-href="invite" href="${invite}" target="_blank" rel="noopener noreferrer">
-                  Invite to Discord
+                  Open in Telegram
                   <span class="kbd">↗</span>
                 </a>
                 <a class="btn" data-bind-href="support" href="${support}" target="_blank" rel="noopener noreferrer">Support</a>
@@ -169,7 +170,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                 <p class="panelTitle">Quick start</p>
                 <span class="pill" id="heroHealthPill" aria-live="polite">
                   <span class="dot warn" id="heroHealthDot" aria-hidden="true"></span>
-                  <span id="heroHealthText"><a href="${invite}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;font-weight:bold;color:var(--text)">Invite</a></span>
+                  <span id="heroHealthText"><a href="${invite}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;font-weight:bold;color:var(--text)">Open</a></span>
                 </span>
               </div>
 
@@ -225,7 +226,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
         <div class="container">
           <div class="secHead reveal">
             <div>
-              <h2 class="h2">Everything a server needs, in one bot</h2>
+              <h2 class="h2">Everything a Telegram chat needs, in one bot</h2>
               <p class="sub">
                 Designed as a versatile utilities suite: moderation and security, economy & minigames, everyday utilities, leveling, and an Express status layer.
               </p>
@@ -265,10 +266,10 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                 <h3 class="featTitle">Utilities that feel instant</h3>
               </div>
               <p class="featP">
-                Server/user/channel/role info, avatar/banner, snipe, AFK, polls, reminders, timestamp generator, say, and custom prefixes.
+                Chat/user info, AFK, polls, reminders, translation, say, custom prefixes, and compact utility commands.
               </p>
               <div class="chipRow" aria-label="Utilities highlights">
-                <span class="chip">serverinfo</span>
+                <span class="chip">chatinfo</span>
                 <span class="chip">reminders</span>
                 <span class="chip">timestamp</span>
                 <span class="chip">prefix</span>
@@ -288,7 +289,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                 <h3 class="featTitle">Economy, minigames & leveling</h3>
               </div>
               <p class="featP">
-                Server economy with daily/weekly rewards, leaderboard tracking, and fun games like blackjack, slots, fishing, and more. Leveling is opt-in per server.
+                Chat economy with daily/weekly rewards, leaderboard tracking, and fun games like blackjack, slots, fishing, and more. Leveling is opt-in per chat.
               </p>
               <div class="chipRow" aria-label="Game highlights">
                 <span class="chip">daily</span>
@@ -341,7 +342,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                     <span class="kbd">PostgreSQL</span>
                   </div>
                   <div class="stepT">Persistence</div>
-                  <div class="stepP">Economy, leveling, reminders, and server settings.</div>
+                  <div class="stepP">Economy, leveling, reminders, and chat settings.</div>
                 </div>
                 <div class="step">
                   <div class="stepTop">
@@ -364,10 +365,10 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                 <div class="step">
                   <div class="stepTop">
                     <div class="stepN">Step 01</div>
-                    <span class="kbd">Invite</span>
+                    <span class="kbd">Open</span>
                   </div>
-                  <div class="stepT">Add to server</div>
-                  <div class="stepP">Invite the bot with the required permissions for your needs.</div>
+                  <div class="stepT">Add to Telegram</div>
+                  <div class="stepP">Open the bot in Telegram, then add it to a group when needed.</div>
                 </div>
 
                 <div class="step">
@@ -394,13 +395,13 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
                     <span class="kbd">/level</span>
                   </div>
                   <div class="stepT">Opt-in leveling</div>
-                  <div class="stepP">Enable per-server leveling when you’re ready.</div>
+                  <div class="stepP">Enable per-chat leveling when you’re ready.</div>
                 </div>
               </div>
 
               <div style="margin-top:14px;display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btnPrimary" data-bind-href="invite" href="${invite}" target="_blank" rel="noopener noreferrer">Invite now</a>
-                <a class="btn" data-bind-href="github" href="https://github.com/ZiolKen/discord-bot" target="_blank" rel="noopener noreferrer">View source</a>
+                <a class="btn btnPrimary" data-bind-href="invite" href="${invite}" target="_blank" rel="noopener noreferrer">Open bot</a>
+                <a class="btn" data-bind-href="github" href="https://github.com/ZiolKen/telegram-bot" target="_blank" rel="noopener noreferrer">View source</a>
               </div>
             </div>
           </div>
@@ -415,7 +416,7 @@ function renderLandingPage({ inviteUrl, appName, botAvatar, supportServer, statu
         <div class="rightMini2">
           <span class="pill2">Node <span class="muted2" id="version">22.22.x</span></span>
           <span class="pill2">Host <span class="muted2" id="host">Render</span></span>
-          <a class="pill2 linkish" href="${invite}">Invite</a>
+          <a class="pill2 linkish" href="${invite}">Open</a>
         </div>
       </div>
     </footer>
