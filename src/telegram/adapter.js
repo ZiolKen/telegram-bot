@@ -36,17 +36,40 @@ function makeUser(tgUser) {
     createdTimestamp: Date.now(),
     displayAvatarURL() { return ''; },
     bannerURL() { return null; },
-    toString() { return tgUser?.username ? `@${tgUser.username}` : `[${username}](tg://user?id=${id})`; }
+    toString() { return tgUser?.username ? `@${tgUser.username}` : username; }
   };
 }
 
+function stripMarkdownLite(text) {
+  let s = String(text ?? '');
+
+  s = s.replace(/```([\s\S]*?)```/g, '$1');
+  s = s.replace(/`([^`]*)`/g, '$1');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1');
+  s = s.replace(/__([^_]+)__/g, '$1');
+  s = s.replace(/~~([^~]+)~~/g, '$1');
+  s = s.replace(/\*([^*]+)\*/g, '$1');
+  s = s.replace(/_([^_\n]{1,80})_/g, '$1');
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, label, url) => {
+    const a = String(label).trim();
+    const b = String(url).trim();
+    return a && a !== b ? `${a}: ${b}` : b;
+  });
+
+  return s;
+}
+
 function cleanDiscordMarkup(text) {
-  return String(text ?? '')
-    .replace(/<@!?(\d+)>/g, 'tg://user?id=$1')
+  return stripMarkdownLite(text)
+    .replace(/<@!?(\d+)>/g, '@$1')
     .replace(/<#(-?\d+)>/g, '#$1')
     .replace(/<@&(-?\d+)>/g, '@role:$1')
-    .replace(/<t:(\d+):R>/g, (_, s) => relativeTime(Number(s) * 1000))
-    .replace(/<t:(\d+):D>/g, (_, s) => new Date(Number(s) * 1000).toLocaleDateString('en-US'));
+    .replace(/tg:\/\/user\?id=(\w+)/g, '@$1')
+    .replace(/<t:(\d+):R>/g, (_, sec) => relativeTime(Number(sec) * 1000))
+    .replace(/<t:(\d+):D>/g, (_, sec) => new Date(Number(sec) * 1000).toLocaleDateString('en-US'))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function relativeTime(ms) {
@@ -69,20 +92,21 @@ function relativeTime(ms) {
 function embedToText(embed) {
   const data = typeof embed?.toJSON === 'function' ? embed.toJSON() : (embed?.data || embed || {});
   const lines = [];
-  if (data.title) lines.push(`**${data.title}**`);
+  if (data.title) lines.push(String(data.title));
   if (data.description) lines.push(String(data.description));
   if (Array.isArray(data.fields)) {
     for (const f of data.fields) {
       if (!f) continue;
-      const name = f.name ? `**${f.name}**` : '';
-      const value = f.value == null ? '' : String(f.value);
-      lines.push(name ? `${name}\n${value}` : value);
+      const name = f.name ? String(f.name).trim() : '';
+      const value = f.value == null ? '' : String(f.value).trim();
+      if (!name && !value) continue;
+      lines.push(name ? `${name}: ${value || '-'}` : value);
     }
   }
-  if (data.footer?.text) lines.push(`_${data.footer.text}_`);
+  if (data.footer?.text) lines.push(String(data.footer.text));
   if (data.image?.url) lines.push(data.image.url);
   if (data.thumbnail?.url) lines.push(data.thumbnail.url);
-  return cleanDiscordMarkup(lines.filter(Boolean).join('\n\n')).trim();
+  return cleanDiscordMarkup(lines.filter(Boolean).join('\n')).trim();
 }
 
 function payloadToText(payload) {
@@ -95,7 +119,7 @@ function payloadToText(payload) {
       if (txt) lines.push(txt);
     }
   }
-  return lines.join('\n\n').trim() || ' '; 
+  return cleanDiscordMarkup(lines.join('\n\n')) || ' ';
 }
 
 function componentToKeyboard(components) {
@@ -289,13 +313,18 @@ async function sendPayload(client, chatId, payload, extra = {}) {
   const reply_markup = componentToKeyboard(payload?.components);
   const options = {
     disable_web_page_preview: true,
+    allow_sending_without_reply: true,
     ...extra,
     ...(reply_markup ? { reply_markup } : {})
   };
-  const msg = await client.bot.sendMessage(chatId, text, options).catch(async err => {
-    const fallback = trimMessage(text.replace(/[\*_`\[\]()~>#+\-=|{}.!]/g, ''));
-    return client.bot.sendMessage(chatId, fallback || ' ', { disable_web_page_preview: true, ...extra }).catch(() => null);
+
+  let msg = await client.bot.sendMessage(chatId, text, options).catch(async () => {
+    const fallbackOptions = { ...options };
+    delete fallbackOptions.reply_to_message_id;
+    const fallback = trimMessage(cleanDiscordMarkup(text).replace(/[\u0000-\u001f\u007f]/g, ''));
+    return client.bot.sendMessage(chatId, fallback || ' ', fallbackOptions).catch(() => null);
   });
+
   await sendFiles(client, chatId, payload?.files, extra);
   if (msg) client.rememberMessage(msg);
   return msg;
@@ -309,7 +338,10 @@ async function editPayload(client, chatId, messageId, payload) {
     message_id: messageId,
     disable_web_page_preview: true,
     reply_markup
-  }).catch(() => null);
+  }).catch(async () => client.bot.editMessageReplyMarkup(reply_markup, {
+    chat_id: chatId,
+    message_id: messageId
+  }).catch(() => null));
 }
 
 class TelegramCollector extends EventEmitter {
